@@ -22,9 +22,10 @@
 13. [Internacionalización (i18n)](#13-internacionalización-i18n)
 14. [Generative Engine Optimization (GEO)](#14-generative-engine-optimization-geo)
 15. [Anatomía de un resultado de búsqueda (SERP)](#15-anatomía-de-un-resultado-de-búsqueda-serp)
-16. [Checklist SEO rápido](#16-checklist-seo-rápido)
-17. [Herramientas de validación](#17-herramientas-de-validación)
-18. [Fuentes](#18-fuentes)
+16. [Favicon e íconos](#16-favicon-e-íconos)
+17. [Checklist SEO rápido](#17-checklist-seo-rápido)
+18. [Herramientas de validación](#18-herramientas-de-validación)
+19. [Fuentes](#19-fuentes)
 
 ---
 
@@ -789,7 +790,120 @@ Puedes dejarlo (otros consumidores de datos estructurados lo leen) o eliminarlo.
 
 ---
 
-## 16. Checklist SEO rápido
+## 16. Favicon e íconos
+
+El favicon es la única parte del resultado de búsqueda que es un **archivo**, no una etiqueta. Aparece junto al dominio en los resultados de móvil y en la pestaña del navegador.
+
+### Requisitos oficiales de Google
+
+Fuente: [Favicon in Search — Google Search Central](https://developers.google.com/search/docs/appearance/favicon-in-search).
+
+| Regla | Detalle |
+|---|---|
+| Tamaño mínimo | 8x8 px |
+| Tamaño recomendado | Mayor a 48x48 px |
+| Forma | Cuadrado (ratio 1:1) |
+| Formato | Cualquier formato de favicon válido |
+| URL estable | No cambiar la URL con frecuencia |
+| Crawleable | Googlebot-Image debe poder leer el favicon **y** Googlebot la home. Ninguno bloqueado en `robots.txt` |
+| Uno por sitio | Google Search soporta **un solo favicon por hostname** |
+| Contenido | Sin material inapropiado — Google lo sustituye por el ícono por defecto |
+
+Valores de `rel` que Google acepta:
+
+```html
+<link rel="icon" href="/icon.png">
+<link rel="shortcut icon" href="/favicon.ico">
+<link rel="apple-touch-icon" href="/apple-icon.png">
+<link rel="apple-touch-icon-precomposed" href="/apple-icon.png">
+```
+
+El `href` puede ser relativo, absoluto o apuntar a un CDN externo.
+
+### Convención de archivos en App Router
+
+No hace falta escribir ningún `<link>`: Next.js genera las etiquetas a partir del nombre del archivo dentro de `app/`.
+
+| Archivo | Etiqueta generada | Notas |
+|---|---|---|
+| `app/favicon.ico` | `<link rel="icon" type="image/x-icon">` | Solo en la raíz de `app/` |
+| `app/icon.(ico\|jpg\|jpeg\|png\|svg)` | `<link rel="icon">` | Válido en cualquier segmento |
+| `app/apple-icon.(jpg\|jpeg\|png)` | `<link rel="apple-touch-icon">` | Válido en cualquier segmento |
+| `app/icon.tsx` | `<link rel="icon">` | Generado por código con `ImageResponse` |
+| `app/apple-icon.tsx` | `<link rel="apple-touch-icon">` | Generado por código con `ImageResponse` |
+
+Para varios tamaños, numera los archivos: `icon1.png`, `icon2.png`.
+
+### Tamaños recomendados
+
+| Archivo | Tamaño | Para qué |
+|---|---|---|
+| `favicon.ico` | 32x32 (o 16x16 + 32x32) | Pestaña del navegador, compatibilidad legacy |
+| `icon.png` | 512x512 | Favicon moderno, resultados de Google, PWA |
+| `apple-icon.png` | 180x180 | Pantalla de inicio en iOS |
+
+Un favicon debería pesar **pocos KB**. Si tu `icon.png` pesa cientos de KB o más de 1 MB, está sin optimizar: se descarga en cada visita y engorda la imagen de despliegue.
+
+### ⚠️ Gotcha: `metadata.icons` NO reemplaza a la convención de archivos
+
+Si tienes `app/favicon.ico` y además declaras `icons` en la metadata, **Next.js emite ambos**. Los `<link>` se duplican:
+
+```tsx
+// ❌ Con app/favicon.ico y app/icon.png ya presentes, esto DUPLICA las etiquetas
+export const metadata: Metadata = {
+  icons: {
+    icon: [{ url: "/favicon.ico" }, { url: "/icon.png", type: "image/png" }],
+    shortcut: "/favicon.ico",
+    apple: "/icon.png",
+  },
+};
+```
+
+```html
+<!-- Resultado: 5 links de ícono para 2 archivos reales -->
+<link rel="shortcut icon" href="/favicon.ico"/>
+<link rel="icon" href="/favicon.ico?favicon.2hq3nsf.ico" sizes="256x256" type="image/x-icon"/>
+<link rel="icon" href="/favicon.ico"/>
+<link rel="icon" href="/icon.png" type="image/png"/>
+<link rel="apple-touch-icon" href="/icon.png"/>
+```
+
+No rompe nada (Google elige uno), pero es ruido y los `sizes` declarados pueden no coincidir con el contenido real del archivo.
+
+**Elige una vía, no las dos:**
+
+- **Convención de archivos** (recomendado): coloca `favicon.ico`, `icon.png` y `apple-icon.png` en `app/` y **omite** `icons` en la metadata.
+- **Metadata explícita**: usa `icons` solo si los íconos viven en `public/` o en un CDN, y entonces no pongas los archivos en `app/`.
+
+### Íconos del manifest
+
+El `manifest.ts` lleva su propio array de íconos, independiente de los `<link>`:
+
+```ts
+icons: [
+  { src: "/icon.png", sizes: "512x512", type: "image/png", purpose: "any" },
+  { src: "/icon-maskable.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
+],
+```
+
+`purpose: "maskable"` evita que Android recorte tu logo al aplicar su máscara circular.
+
+### Errores comunes
+
+| Error | Consecuencia |
+|---|---|
+| PNG de 1 MB como favicon | Descarga innecesaria en cada visita, imagen de despliegue más pesada |
+| Duplicar convención de archivos + `metadata.icons` | `<link>` redundantes, `sizes` incorrectos |
+| Copia huérfana en `public/` y en `app/` | Peso muerto en el bundle |
+| Favicon no cuadrado | Google puede rechazarlo o deformarlo |
+| Cambiar la URL del favicon en cada deploy | Google tarda en actualizarlo |
+| Bloquear el favicon o la home en `robots.txt` | Google no lo muestra |
+
+> El favicon se actualiza en los resultados cuando Google vuelve a rastrear la home. Puede tardar días o semanas, y no hay forma de forzarlo.
+
+---
+
+## 17. Checklist SEO rápido
 
 ### Antes del lanzamiento
 
@@ -805,7 +919,9 @@ Puedes dejarlo (otros consumidores de datos estructurados lo leen) o eliminarlo.
 - [ ] JSON-LD con al menos `Organization` y `WebSite`
 - [ ] JSON-LD `FAQPage` si tienes sección de FAQ
 - [ ] JSON-LD `Product`/`SoftwareApplication` si tienes precios
-- [ ] Favicon configurado
+- [ ] Favicon cuadrado, >48x48, de pocos KB (ver sección 16)
+- [ ] Sin duplicar convención de archivos y `metadata.icons`
+- [ ] `apple-icon.png` de 180x180
 - [ ] `next/image` en todas las imágenes con `alt` descriptivo
 - [ ] `next/font` para fuentes (sin `@import url()`)
 - [ ] `priority` en la imagen LCP (hero)
@@ -834,7 +950,7 @@ Puedes dejarlo (otros consumidores de datos estructurados lo leen) o eliminarlo.
 
 ---
 
-## 17. Herramientas de validación
+## 18. Herramientas de validación
 
 | Herramienta | Qué valida | URL |
 |---|---|---|
@@ -849,7 +965,7 @@ Puedes dejarlo (otros consumidores de datos estructurados lo leen) o eliminarlo.
 
 ---
 
-## 18. Fuentes
+## 19. Fuentes
 
 - [Documentación oficial SEO — Next.js](https://nextjs.org/learn/seo)
 - [Next.js SEO Playbook — Vercel](https://vercel.com/blog/nextjs-seo-playbook)
@@ -858,6 +974,8 @@ Puedes dejarlo (otros consumidores de datos estructurados lo leen) o eliminarlo.
 - [JSON-LD Guide — Next.js Docs](https://nextjs.org/docs/app/guides/json-ld)
 - [robots.txt — Next.js Docs](https://nextjs.org/docs/app/api-reference/file-conventions/metadata/robots)
 - [Sitelinks — Google Search Central](https://developers.google.com/search/docs/appearance/sitelinks)
+- [Favicon in Search — Google Search Central](https://developers.google.com/search/docs/appearance/favicon-in-search)
+- [Metadata Files: favicon, icon, apple-icon — Next.js Docs](https://nextjs.org/docs/app/api-reference/file-conventions/metadata/app-icons)
 - [Snippets y meta descriptions — Google Search Central](https://developers.google.com/search/docs/appearance/snippet)
 - [Retiro del Sitelinks Searchbox — Google Search Central](https://developers.google.com/search/blog/2024/10/sitelinks-search-box)
 - [Core Web Vitals — Next.js](https://nextjs.org/learn/seo/improve)
