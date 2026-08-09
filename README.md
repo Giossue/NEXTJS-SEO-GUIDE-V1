@@ -21,9 +21,10 @@
 12. [Core Web Vitals](#12-core-web-vitals)
 13. [Internacionalización (i18n)](#13-internacionalización-i18n)
 14. [Generative Engine Optimization (GEO)](#14-generative-engine-optimization-geo)
-15. [Checklist SEO rápido](#15-checklist-seo-rápido)
-16. [Herramientas de validación](#16-herramientas-de-validación)
-17. [Fuentes](#17-fuentes)
+15. [Anatomía de un resultado de búsqueda (SERP)](#15-anatomía-de-un-resultado-de-búsqueda-serp)
+16. [Checklist SEO rápido](#16-checklist-seo-rápido)
+17. [Herramientas de validación](#17-herramientas-de-validación)
+18. [Fuentes](#18-fuentes)
 
 ---
 
@@ -190,7 +191,8 @@ export async function generateMetadata({ params }): Promise<Metadata> {
 ### Buenas prácticas de metadata
 
 - **Título**: 50-60 caracteres. Incluye la keyword principal al inicio.
-- **Descripción**: 150-160 caracteres. Incluye un CTA o propuesta de valor.
+- **Descripción**: 150-160 caracteres. Incluye un CTA o propuesta de valor. Es lo que alimenta el **snippet** del resultado — ver sección 15.
+- **`max-snippet: -1`**: quita el límite de caracteres del snippet. Con `0` Google no muestra snippet; con un número, lo trunca a esa longitud.
 - **Keywords**: Usa 5-15 keywords relevantes (Google no las usa directamente, pero otros motores sí).
 - Cada página debe tener título y descripción **únicos**.
 - Usa `template` en el layout raíz para consistencia: `"%s | Mi Sitio"`.
@@ -392,6 +394,9 @@ const websiteSchema = {
   url: "https://tusitio.com",
   description: "Descripción breve.",
   inLanguage: "es",
+  // ⚠️ Obsoleto: Google retiró el rich result de Sitelinks Searchbox en nov 2024.
+  // Sigue siendo válido como dato estructurado, pero ya no produce ningún
+  // resultado enriquecido. Ver sección 15.
   potentialAction: {
     "@type": "SearchAction",
     target: "https://tusitio.com/search?q={search_term_string}",
@@ -678,7 +683,113 @@ En 2026, las IAs (ChatGPT, Perplexity, Google AI Overviews) citan páginas web. 
 
 ---
 
-## 15. Checklist SEO rápido
+## 15. Anatomía de un resultado de búsqueda (SERP)
+
+Antes de optimizar conviene saber cómo se llama cada parte del resultado, porque **no todas se controlan igual**: unas se declaran en código, otras las genera Google por algoritmo y no hay markup que las fuerce.
+
+### Partes de un resultado
+
+| Nombre | Qué es | ¿Se controla? |
+|---|---|---|
+| **Título** (title link) | El enlace azul | Parcial — sale del `<title>`, Google puede reescribirlo |
+| **Snippet** (meta description) | Las 1-2 líneas de descripción bajo el título | Parcial — sale de `<meta name="description">`, Google puede reescribirlo |
+| **URL / breadcrumb** | La ruta sobre el título | Sí — con URLs semánticas y schema `BreadcrumbList` |
+| **Favicon** | El ícono junto al dominio | Sí — `icon.png` / `favicon.ico` |
+| **Sitelinks** | Los sub-enlaces listados debajo del resultado principal | **No** — algorítmico |
+| **Expanded sitelinks** | Sitelinks en lista vertical, cada uno con su propia descripción | **No** — algorítmico |
+| **Jump-to links** | Enlaces directos a anclas (`#seccion`) dentro de la misma página | **No** — algorítmico, pero requiere `id` en el HTML |
+| **Rich results** | Estrellas, FAQs desplegables, precios, breadcrumbs visuales | Sí — con JSON-LD (ver sección 8) |
+
+### Snippet
+
+Es el texto descriptivo bajo el título. Se declara así:
+
+```tsx
+export const metadata: Metadata = {
+  description: "Descripción de 150-160 caracteres con propuesta de valor.",
+};
+```
+
+Google **reescribe el snippet en ~70% de los casos** si considera que otro fragmento de la página responde mejor a la consulta. La `meta description` es una sugerencia fuerte, no una garantía.
+
+Directivas relacionadas (sección 4):
+
+| Directiva | Efecto |
+|---|---|
+| `"max-snippet": -1` | Sin límite de caracteres en el snippet |
+| `"max-snippet": 0` | Sin snippet (solo título) |
+| `"max-snippet": 160` | Máximo 160 caracteres |
+| `data-nosnippet` | Atributo HTML: excluye ese bloque del snippet |
+
+```html
+<!-- Este bloque nunca aparecerá en el snippet -->
+<span data-nosnippet>Precio sujeto a cambios.</span>
+```
+
+Para que el snippet salga bien:
+
+- Escribe 150-160 caracteres, únicos por página.
+- Incluye la keyword principal de forma natural.
+- Añade propuesta de valor o CTA — es texto de venta, no un resumen técnico.
+- Si Google la reescribe siempre, suele significar que no responde a la intención de búsqueda real.
+
+### Sitelinks
+
+Son los sub-enlaces que aparecen bajo un resultado. Cuando se muestran en lista vertical con descripción propia se llaman **expanded sitelinks**.
+
+> **No existe forma de generarlos por código.** No hay schema, meta tag, archivo ni configuración de Search Console que los produzca. Google los arma por algoritmo cuando confía en la estructura del sitio, normalmente en búsquedas de marca.
+
+Lo único que se puede hacer es influir indirectamente:
+
+| Factor | Cómo trabajarlo |
+|---|---|
+| Estructura de navegación clara | Jerarquía plana y lógica, menú consistente en todo el sitio |
+| Enlaces internos | Anchor text descriptivo y repetido igual en todo el sitio |
+| Títulos únicos y descriptivos | Uno por página, sin plantillas duplicadas |
+| URLs semánticas | `/servicios/auditoria` no `/?id=42` |
+| Autoridad de marca | Volumen de búsquedas del nombre de la marca |
+| Sitemap correcto | Solo URLs indexables y canónicas |
+
+En Search Console ya **no** existe la herramienta de degradar sitelinks (retirada en 2016). La única vía indirecta hoy es aplicar `noindex` a la página que no quieres que aparezca como sitelink.
+
+Un sitio de una sola página (one-page landing con anclas) casi nunca obtiene sitelinks: Google necesita varias páginas reales con contenido propio. Si los sitelinks son un objetivo, hay que convertir las secciones ancla en rutas independientes.
+
+### Jump-to links
+
+Son enlaces a anclas de la misma página (`tusitio.com/#servicios`) que Google muestra dentro del resultado. También son algorítmicos, pero **sí dependen de que el HTML lo permita**:
+
+```tsx
+// Cada sección con id estable y un heading claro
+<section id="servicios">
+  <h2>Servicios</h2>
+  {/* ... */}
+</section>
+```
+
+- Usa `id` estables y descriptivos (`#servicios`, no `#section-3`).
+- Cada ancla debe tener un heading (`<h2>`/`<h3>`) que la describa.
+- Enlaza esas anclas desde tu propia navegación.
+
+Es la alternativa realista a los sitelinks para un landing de una sola página.
+
+### Sitelinks Searchbox — retirado
+
+El schema `SearchAction` dentro de `WebSite` generaba una caja de búsqueda dentro del resultado. **Google retiró este rich result en noviembre de 2024.**
+
+```tsx
+// Ya NO genera ningún rich result. Inofensivo, pero sin efecto.
+potentialAction: {
+  "@type": "SearchAction",
+  target: "https://tusitio.com/search?q={search_term_string}",
+  "query-input": "required name=search_term_string",
+}
+```
+
+Puedes dejarlo (otros consumidores de datos estructurados lo leen) o eliminarlo. No afecta al ranking en ninguno de los dos casos.
+
+---
+
+## 16. Checklist SEO rápido
 
 ### Antes del lanzamiento
 
@@ -701,6 +812,8 @@ En 2026, las IAs (ChatGPT, Perplexity, Google AI Overviews) citan páginas web. 
 - [ ] Sin contenido duplicado (títulos, descripciones)
 - [ ] URLs limpias y semánticas (`/precios` no `/?section=pricing`)
 - [ ] Links internos entre secciones/páginas
+- [ ] `id` estables y descriptivos en cada sección ancla (habilita jump-to links)
+- [ ] Anchor text consistente en toda la navegación (influye en sitelinks)
 - [ ] HTTPS habilitado
 
 ### Core Web Vitals
@@ -721,7 +834,7 @@ En 2026, las IAs (ChatGPT, Perplexity, Google AI Overviews) citan páginas web. 
 
 ---
 
-## 16. Herramientas de validación
+## 17. Herramientas de validación
 
 | Herramienta | Qué valida | URL |
 |---|---|---|
@@ -736,7 +849,7 @@ En 2026, las IAs (ChatGPT, Perplexity, Google AI Overviews) citan páginas web. 
 
 ---
 
-## 17. Fuentes
+## 18. Fuentes
 
 - [Documentación oficial SEO — Next.js](https://nextjs.org/learn/seo)
 - [Next.js SEO Playbook — Vercel](https://vercel.com/blog/nextjs-seo-playbook)
@@ -744,6 +857,9 @@ En 2026, las IAs (ChatGPT, Perplexity, Google AI Overviews) citan páginas web. 
 - [generateMetadata — Next.js API Reference](https://nextjs.org/docs/app/api-reference/functions/generate-metadata)
 - [JSON-LD Guide — Next.js Docs](https://nextjs.org/docs/app/guides/json-ld)
 - [robots.txt — Next.js Docs](https://nextjs.org/docs/app/api-reference/file-conventions/metadata/robots)
+- [Sitelinks — Google Search Central](https://developers.google.com/search/docs/appearance/sitelinks)
+- [Snippets y meta descriptions — Google Search Central](https://developers.google.com/search/docs/appearance/snippet)
+- [Retiro del Sitelinks Searchbox — Google Search Central](https://developers.google.com/search/blog/2024/10/sitelinks-search-box)
 - [Core Web Vitals — Next.js](https://nextjs.org/learn/seo/improve)
 - [Next.js SEO Optimization Guide 2026 — Djamware](https://www.djamware.com/post/nextjs-seo-optimization-guide-2026-edition)
 - [How to Optimize SEO with Next.js in 2026 — DEV Community](https://dev.to/texavor/how-to-optimize-seo-with-nextjs-in-2026-1bhl)
